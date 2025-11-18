@@ -1,26 +1,26 @@
-// =========================================================
-// ED AI TUTOR BACKEND — FIXED VERSION (CORS + message/query)
-// =========================================================
-
 import OpenAI from "openai";
 import fetch from "node-fetch";
 import fs from "fs/promises";
 import path from "path";
 
-// -----------------------------
-//   ENABLE CORS FOR BROWSER
-// -----------------------------
-function allowCors(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-}
+// ---------------------------------------------------
+//  CORS ALLOW (FIXES YOUR FRONTEND CONNECTION ERROR)
+// ---------------------------------------------------
+export const config = {
+  api: {
+    bodyParser: true,
+  },
+};
 
 // -----------------------------
 //  Load Instruction File
 // -----------------------------
 async function loadInstructions() {
-  const filePath = path.join(process.cwd(), "instructions", "ED_AI_TUTOR_Instructions_v2025_14.txt");
+  const filePath = path.join(
+    process.cwd(),
+    "instructions",
+    "ED_AI_TUTOR_Instructions_v2025_14.txt"
+  );
   return await fs.readFile(filePath, "utf-8");
 }
 
@@ -32,58 +32,57 @@ async function loadEngines() {
   const engineFiles = await fs.readdir(enginesDir);
 
   const engines = {};
+
   for (const file of engineFiles) {
     const filePath = path.join(enginesDir, file);
     const content = await fs.readFile(filePath, "utf-8");
     engines[file.replace(".json", "")] = JSON.parse(content);
   }
+
   return engines;
 }
 
 // -----------------------------
-// GitHub Fetch Function (SAFE)
+// GitHub Fetch Function
 // -----------------------------
 async function fetchGithubGuideline(query) {
-  try {
-    const repo = "paramson/edaitutor-reference-library";
-    const searchUrl =
-      `https://api.github.com/search/code?q=${encodeURIComponent(query)}+repo:${repo}`;
+  const repo = "paramson/edaitutor-reference-library";
+  const searchUrl = `https://api.github.com/search/code?q=${encodeURIComponent(
+    query
+  )}+repo:${repo}`;
 
-    const results = await fetch(searchUrl).then((res) => res.json());
+  const results = await fetch(searchUrl).then((res) => res.json());
+  if (!results.items || results.items.length === 0) return null;
 
-    if (!results.items || results.items.length === 0) return null;
+  const file = results.items[0];
+  const fileData = await fetch(file.url).then((res) => res.json());
+  const decoded = Buffer.from(fileData.content, "base64").toString("utf-8");
 
-    const file = results.items[0];
-    const fileData = await fetch(file.url).then((res) => res.json());
-
-    const decoded = Buffer.from(fileData.content, "base64").toString("utf-8");
-    return decoded;
-  } catch (err) {
-    return "GitHub guideline fetch error";
-  }
+  return decoded;
 }
 
-// =========================================================
-//                MAIN API ROUTE (FIXED)
-// =========================================================
+// -----------------------------
+//    MAIN API ROUTE
+// -----------------------------
 export default async function handler(req, res) {
-  allowCors(res);
+  // ----------------- CORS FIX -----------------
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") {
-    return res.status(200).end();
+    return res.status(200).end(); // CORS preflight
   }
+  // --------------------------------------------
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "POST only" });
   }
 
-  // Accept both { message } and { query }
-  const message = req.body.message || req.body.query;
-  if (!message) {
-    return res.status(400).json({ error: "Missing message or query" });
-  }
+  const { message } = req.body;
+  if (!message) return res.status(400).json({ error: "Missing message" });
 
-  // Load core components
+  // Load instructions & engines
   const systemInstructions = await loadInstructions();
   const engines = await loadEngines();
 
@@ -91,12 +90,11 @@ export default async function handler(req, res) {
   const keyword = message.split(" ").slice(0, 5).join(" ");
   const guideline = await fetchGithubGuideline(keyword);
 
-  // OpenAI client (server-side)
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
   });
 
-  // Final context
+  // Build final context
   const context = `
 ${systemInstructions}
 
@@ -111,20 +109,16 @@ ${message}
 `;
 
   // Call OpenAI
-  try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4.1",
-      messages: [
-        { role: "system", content: context },
-        { role: "user", content: message },
-      ],
-      temperature: 0.2,
-    });
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4.1",
+    messages: [
+      { role: "system", content: context },
+      { role: "user", content: message },
+    ],
+    temperature: 0.2,
+  });
 
-    const reply = completion.choices[0].message.content;
-    return res.status(200).json({ reply });
+  const reply = completion.choices[0].message.content;
 
-  } catch (err) {
-    return res.status(500).json({ error: "OpenAI request failed", details: err.message });
-  }
+  return res.status(200).json({ reply });
 }
