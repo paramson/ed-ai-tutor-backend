@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "functions": {
+    "api/tutor.js": {
+      "runtime": "nodejs20.x"
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/tutor",
+      "dest": "/api/tutor.js"
+    }
+  ]
+}
