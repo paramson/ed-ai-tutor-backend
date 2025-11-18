@@ -1,10 +1,11 @@
 {
   "version": 2,
-  "functions": {
-    "api/tutor.js": {
-      "runtime": "nodejs20.x"
+  "builds": [
+    {
+      "src": "api/tutor.js",
+      "use": "@vercel/node"
     }
-  },
+  ],
   "routes": [
     {
       "src": "/api/tutor",
