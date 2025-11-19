@@ -62,12 +62,17 @@ async function loadEngines() {
 // -----------------------------
 function extractText(response) {
   try {
-    const blocks = response.output?.[0]?.content || [];
+    // 🔧 FIX: make *response itself* optional
+    const blocks = response?.output?.[0]?.content || [];
+
     for (const block of blocks) {
       if (typeof block.text === "string") return block.text;
       if (block.output_text?.text) return block.output_text.text;
     }
-  } catch (_) {}
+  } catch (err) {
+    console.warn("⚠️ Failed to extract text from response:", err.message);
+  }
+
   return "";
 }
 
@@ -126,7 +131,6 @@ export default async function handler(req, res) {
       },
     ];
 
-    // 🔥 FIX: gpt-4.1 (Compatible with Responses API)
     const aiResponse = await client.responses.create({
       model: "gpt-4.1",
       instructions,
