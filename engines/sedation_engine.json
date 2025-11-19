@@ -1,1 +1,27 @@
-{}
+{
+  "engine_name": "Procedural Sedation Engine",
+  "description": "Provides safe sedation workflow for ED procedures.",
+  "patterns": [
+    "sedation",
+    "ketamine",
+    "midazolam",
+    "propofol",
+    "procedural sedation"
+  ],
+  "workflow": {
+    "preparation": [
+      "Consent",
+      "Airway assessment",
+      "Monitoring setup (ECG, SpO₂, BP, capnography)"
+    ],
+    "agents": {
+      "ketamine": "1–1.5 mg/kg IV",
+      "propofol": "1 mg/kg IV (titrate)",
+      "midazolam": "0.05–0.1 mg/kg"
+    },
+    "recovery": [
+      "Continuous monitoring",
+      "Discharge criteria"
+    ]
+  }
+}
