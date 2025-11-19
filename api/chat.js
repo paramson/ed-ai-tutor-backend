@@ -10,7 +10,12 @@ export const config = {
 };
 
 // -----------------------------
-// Load Instruction File
+// CONSTANTS
+// -----------------------------
+const GITHUB_REPO = "paramson/edaitutor-reference-library";
+
+// -----------------------------
+// LOAD INSTRUCTIONS
 // -----------------------------
 async function loadInstructions() {
   const filePath = path.join(
@@ -22,7 +27,7 @@ async function loadInstructions() {
 }
 
 // -----------------------------
-// Load Engines
+// LOAD ENGINES
 // -----------------------------
 async function loadEngines() {
   const enginesDir = path.join(process.cwd(), "engines");
@@ -39,10 +44,8 @@ async function loadEngines() {
 }
 
 // -----------------------------
-// GitHub Guideline Retrieval
+// GITHUB GUIDELINE SEARCH
 // -----------------------------
-const GITHUB_REPO = "paramson/edaitutor-reference-library";
-
 async function searchGithubGuidelines(message, maxFiles = 3) {
   try {
     const words = message.split(/\s+/).slice(0, 12);
@@ -54,7 +57,11 @@ async function searchGithubGuidelines(message, maxFiles = 3) {
 
     const searchRes = await fetch(searchUrl);
     if (!searchRes.ok) {
-      console.error("GitHub search error:", searchRes.status, await searchRes.text());
+      console.error(
+        "GitHub search error:",
+        searchRes.status,
+        await searchRes.text()
+      );
       return [];
     }
 
@@ -67,18 +74,26 @@ async function searchGithubGuidelines(message, maxFiles = 3) {
       try {
         const fileRes = await fetch(item.url);
         if (!fileRes.ok) {
-          console.error("GitHub file fetch error:", item.path, fileRes.status);
+          console.error(
+            "GitHub file fetch error:",
+            item.path,
+            fileRes.status
+          );
           continue;
         }
 
         const fileData = await fileRes.json();
         if (!fileData.content) continue;
 
-        const decoded = Buffer.from(fileData.content, "base64").toString("utf-8");
+        const decoded = Buffer.from(fileData.content, "base64").toString(
+          "utf-8"
+        );
 
         const MAX_CHARS = 8000;
         const truncatedContent =
-          decoded.length > MAX_CHARS ? decoded.slice(0, MAX_CHARS) + "\n\n...[truncated]" : decoded;
+          decoded.length > MAX_CHARS
+            ? decoded.slice(0, MAX_CHARS) + "\n\n...[truncated]"
+            : decoded;
 
         guidelines.push({
           path: item.path,
@@ -97,123 +112,144 @@ async function searchGithubGuidelines(message, maxFiles = 3) {
 }
 
 // -----------------------------
-// Build System Prompt (Markdown + icons)
+// BUILD CONTEXT BLOCK (ENGINES + GITHUB)
 // -----------------------------
-function buildSystemPrompt({
-  systemInstructions,
-  engines,
-  githubGuidelines,
-  userMessage,
-  activeEngine,
-}) {
+function buildContextBlock(engines, githubGuidelines) {
   const engineList = Object.keys(engines || {});
-  const activeEngineNote =
-    activeEngine && engineList.includes(activeEngine)
-      ? `ACTIVE ENGINE: ${activeEngine} (prioritise this engine's logic when relevant).`
-      : "No specific engine selected by user — use all relevant engines collaboratively.";
+  const engineSection =
+    engineList.length > 0
+      ? `Available engines:\n- ${engineList.join("\n- ")}`
+      : "No engines detected.";
 
-  const referencedModules =
+  const modulesList =
     githubGuidelines.length > 0
-      ? githubGuidelines.map((g) => `- \`${g.path}\``).join("\n")
+      ? githubGuidelines.map((g) => `- ${g.path}`).join("\n")
       : "- None found (fallback to engines + core reasoning).";
 
-  const guidelinesContent =
+  const modulesContent =
     githubGuidelines.length > 0
       ? githubGuidelines
           .map(
             (g, idx) =>
-              `### 📄 GitHub Module ${idx + 1}: \`${g.path}\`\n\n` +
-              "```text\n" +
-              g.content +
-              "\n```"
+              `### GitHub Module ${idx + 1}: ${g.path}\n\n\`\`\`text\n${g.content}\n\`\`\``
           )
           .join("\n\n---\n\n")
       : "_No GitHub guideline content retrieved for this query. Use local engines + general guideline knowledge, and clearly state that GitHub modules were not available._";
 
   return `
-${systemInstructions}
+[ENGINE CONTEXT]
+${engineSection}
+
+[REFERENCED GITHUB MODULES]
+${modulesList}
+
+[RAW GITHUB CONTENT – READ & INTEGRATE, DO NOT CALL APIs]
+${modulesContent}
+`;
+}
+
+// -----------------------------
+// MARKDOWN TEMPLATE MESSAGE
+// -----------------------------
+const MARKDOWN_TEMPLATE = `
+You MUST format ALL clinical answers in the following EXACT style, using **clean GitHub-flavoured Markdown**.
+
+You MUST preserve headings, blank lines, and bullet structure.
+
+--------------------------------------------------
+## 🧠 STEPWISE CLINICAL REASONING ({AutoTitle})
+--------------------------------------------------
+
+Start with 1–2 sentences summarising the case and pattern recognition. Replace {AutoTitle} with a concise, case-specific pathway title (e.g. "Adult Chest Pain – ACS Pathway", "Paediatric Asthma Exacerbation").
 
 ---
 
-You are running in **BACKEND ORCHESTRATION MODE** for ED AI Tutor.
-
-You **MUST** format all clinical answers using **clean GitHub-flavoured Markdown** with clear section headings and clinical icons.
-
-Use this exact structure (adapt names to the case):
-
-## 🧠 STEPWISE CLINICAL REASONING (Short Title – e.g. Chest Pain – ACS Pathway)
-
 ### 📁 Referenced GitHub Modules
-${referencedModules}
+- {module 1}
+- {module 2}
+- {module 3}
+
+(Replace with the actual modules you used, or "None" if not applicable.)
 
 ---
 
 ### ⚠️ PRIORITY: ABCDE FIRST
-- **Airway:** ...
-- **Breathing:** ...
-- **Circulation:** ...
-- **Disability:** ...
-- **Exposure:** ...
 
-If unstable → clearly state:  
-\`If unstable, immediate resuscitation in resus bay takes priority over diagnostics.\`
+**Airway**  
+- ...
+
+**Breathing**  
+- ...
+
+**Circulation**  
+- ...
+
+**Disability**  
+- ...
+
+**Exposure**  
+- ...
+
+If unstable, clearly state:  
+**"If unstable, immediate resuscitation in the resus bay takes priority over diagnostics."**
 
 ---
 
-### 1️⃣ INITIAL DIFFERENTIAL DIAGNOSIS
-**Common**
+## 1️⃣ INITIAL DIFFERENTIAL DIAGNOSIS
+
+### Common  
 - ...
 
-**Serious – must not miss**
+### Serious – must not miss  
 - ...
 
-**Rare / other**
-- ...
-
----
-
-### 2️⃣ 🧪 INVESTIGATIONS
-**Bedside**
-- ...
-
-**Laboratory**
-- ...
-
-**Imaging**
-- ...
-
----
-
-### 3️⃣ 💊 EMERGENCY DEPARTMENT MANAGEMENT
-**Time-critical / resuscitation**
-- ...
-
-**Core ED care**
-- ...
-
-**Adjuncts**
+### Rare / Other  
 - ...
 
 ---
 
-### 4️⃣ 🚑 DISPOSITION
-- Admit vs discharge criteria
-- Ward / HDU / ICU / theatre
-- Follow-up and referrals
+## 2️⃣ 🧪 INVESTIGATIONS
+
+### Bedside  
+- ...
+
+### Laboratory  
+- ...
+
+### Imaging  
+- ...
 
 ---
 
-### 5️⃣ 🛡️ SAFETY-NETTING & PATIENT EDUCATION
-- Red flags to return
-- Expected course
-- Written/ verbal instructions
+## 3️⃣ 💊 EMERGENCY DEPARTMENT MANAGEMENT
+
+### Time-Critical  
+- ...
+
+### Core ED Care  
+- ...
+
+### Adjuncts  
+- ...
 
 ---
 
-### 📚 Referenced GitHub Modules
-${referencedModules}
+## 4️⃣ 🚑 DISPOSITION
+- ...
 
-### 🌍 International Guideline References (general, not patient-specific)
+---
+
+## 5️⃣ 🛡️ SAFETY-NETTING & DISCHARGE ADVICE
+- ...
+
+---
+
+## 📁 Referenced GitHub Modules Used
+- ...
+
+---
+
+## 🌍 International Guideline References (general, not patient-specific)
 - AU: RCH Clinical Guidelines / ACI NSW  
 - NZ: Starship Clinical Guidelines  
 - UK: NICE / RCEM  
@@ -222,38 +258,19 @@ ${referencedModules}
 
 ---
 
-### 🔄 Optional Follow-Up (you must append this text verbatim)
-At the end of every clinical case answer, append:
+### 🔄 Optional Follow-Up  
+At the very end of your answer, ALWAYS append exactly:
 
-> Would you like:
+> Would you like:  
 > 1) ACEM-style exam practice based on this case (MCQ / SAQ / Viva), or  
 > 2) 1–2 key recent papers or guideline updates with brief PICO-style summaries?
 
-Do **not** generate exam questions or research content unless the user explicitly says yes.
-
----
-
-### ENGINE INTEGRATION (INTERNAL)
-Available engines: ${engineList.join(", ") || "none detected"}  
-${activeEngineNote}
-
-Use the engines plus the GitHub modules **before** answering. Never contradict engine logic.
-
----
-
-### PRE-FETCHED GITHUB GUIDELINE CONTENT (READ & INTEGRATE, DO NOT CALL APIs)
-${guidelinesContent}
-
----
-
-### USER QUESTION (FOR CONTEXT)
-${userMessage}
+DO NOT generate exam questions or research summaries until the user explicitly says yes.
 `;
-}
 
-// --------------------------------------------------
-// MAIN HANDLER — STREAMING FOR FRONTEND
-// --------------------------------------------------
+// -----------------------------
+// MAIN HANDLER — STREAMING
+// -----------------------------
 export default async function handler(req, res) {
   // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -265,27 +282,42 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "POST only" });
 
   try {
-    const { message, model = "gpt-4.1-mini", engine = "None" } = req.body || {};
+    const { message, model = "gpt-4.1-mini", engine = "default" } =
+      req.body || {};
 
     if (!message || typeof message !== "string") {
       return res.status(400).json({ error: "Message is required" });
     }
 
-    const [systemInstructions, engines, githubGuidelines] = await Promise.all([
+    // Load resources in parallel
+    const [rawInstructions, engines, githubGuidelines] = await Promise.all([
       loadInstructions(),
       loadEngines(),
       searchGithubGuidelines(message, 3),
     ]);
 
-    const systemPrompt = buildSystemPrompt({
-      systemInstructions,
-      engines,
-      githubGuidelines,
-      userMessage: message,
-      activeEngine: engine,
-    });
+    const contextBlock = buildContextBlock(engines, githubGuidelines);
 
-    // Streaming headers
+    // SYSTEM MESSAGE 1 — core role + safety + "no weird spaces"
+    const SYSTEM_MSG_1 = `
+${rawInstructions}
+
+Additional backend rules (OVERRIDE ANY CONFLICTING STYLE INSTRUCTIONS):
+
+- ALWAYS output in clean Markdown using the separate MARKDOWN TEMPLATE message.
+- NEVER insert spaces inside individual words (e.g. "Bre athing" is forbidden; use "Breathing").
+- Do NOT break clinical terms apart with spaces.
+- Maintain clear spacing between sections and headings.
+- Use concise, high-yield language suitable for Emergency Medicine education.
+`;
+
+    // SYSTEM MESSAGE 2 — pure markdown template
+    const SYSTEM_MSG_2 = MARKDOWN_TEMPLATE;
+
+    // SYSTEM MESSAGE 3 — engines + GitHub modules
+    const SYSTEM_MSG_3 = contextBlock;
+
+    // Set streaming headers
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
@@ -297,17 +329,26 @@ export default async function handler(req, res) {
     const completion = await openai.chat.completions.create({
       model,
       stream: true,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: message },
-      ],
       temperature: 0.2,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are ED AI Tutor, an Emergency Medicine reasoning engine. ALWAYS follow the formatting rules and safety constraints from the following system messages.",
+        },
+        { role: "system", content: SYSTEM_MSG_1 },
+        { role: "system", content: SYSTEM_MSG_2 },
+        { role: "system", content: SYSTEM_MSG_3 },
+        {
+          role: "user",
+          content: message,
+        },
+      ],
     });
 
     for await (const chunk of completion) {
       const token = chunk?.choices?.[0]?.delta?.content;
       if (token) {
-        // send raw tokens; frontend handles markdown + spacing
         res.write(`data: ${token}\n\n`);
       }
     }
