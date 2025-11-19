@@ -1,1 +1,30 @@
-{}
+{
+  "engine_name": "RSI Engine",
+  "description": "Provides structure for rapid sequence intubation assessment and management.",
+  "patterns": [
+    "RSI",
+    "intubation",
+    "laryngoscope",
+    "airway",
+    "ketamine",
+    "succinylcholine",
+    "rocuronium",
+    "BVM"
+  ],
+  "steps": {
+    "assessment": [
+      "Evaluate airway difficulty",
+      "Assess physiologic difficulty",
+      "Check for red flags"
+    ],
+    "drugs": {
+      "induction": ["Ketamine 1–2 mg/kg", "Propofol 1–2 mg/kg"],
+      "paralytics": ["Rocuronium 1.2 mg/kg", "Succinylcholine 1.5 mg/kg"]
+    },
+    "post_intubation": [
+      "Confirm ETCO₂",
+      "Secure tube",
+      "Ventilator setup"
+    ]
+  }
+}
