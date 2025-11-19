@@ -1,4 +1,4 @@
-// /api/chat.js — FINAL BACKEND WITH MULTI-ORIGIN CORS (ED AI Tutor v2025.14)
+// /api/chat.js — FINAL STABLE BACKEND (ED AI Tutor v2025.14)
 
 import OpenAI from "openai";
 import fs from "fs/promises";
@@ -9,7 +9,7 @@ const client = new OpenAI({
 });
 
 // -----------------------------
-// Load Instructions File
+// Load Instruction File
 // -----------------------------
 async function loadInstructions() {
   try {
@@ -35,7 +35,7 @@ async function loadEngines() {
   try {
     files = await fs.readdir(enginesDir);
   } catch (err) {
-    console.warn("⚠ No engines folder found:", err.message);
+    console.warn("⚠️ No engines folder found:", err.message);
     return {};
   }
 
@@ -50,7 +50,7 @@ async function loadEngines() {
       const parsed = JSON.parse(raw);
       engines[file.replace(".json", "")] = parsed;
     } catch (err) {
-      console.warn(`⚠ Failed to load engine ${file}:`, err.message);
+      console.warn(`⚠️ Failed to load engine ${file}:`, err.message);
     }
   }
 
@@ -68,17 +68,13 @@ function extractText(response) {
       if (block.output_text?.text) return block.output_text.text;
     }
   } catch (_) {}
-
   return "";
 }
 
 // -----------------------------
-// Handler with MULTI-ORIGIN CORS
+// MAIN HANDLER WITH CORS
 // -----------------------------
 export default async function handler(req, res) {
-  // -----------------------------
-  // CORRECT CORS — supports 3 origins
-  // -----------------------------
   const allowedOrigins = [
     "https://edaitutor.org",
     "https://www.edaitutor.org",
@@ -86,7 +82,6 @@ export default async function handler(req, res) {
   ];
 
   const origin = req.headers.origin;
-
   if (allowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   }
@@ -94,27 +89,26 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  // Preflight request
+  // OPTIONS preflight
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
-  // Only allow POST
+  // Allow only POST
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST, OPTIONS");
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   const { message } = req.body || {};
-
   if (!message || typeof message !== "string") {
-    return res.status(400).json({ error: "Missing or invalid message." });
+    return res.status(400).json({ error: "Invalid or missing message." });
   }
 
   try {
     const [instructions, engines] = await Promise.all([
       loadInstructions(),
-      loadEngines(),
+      loadEngines()
     ]);
 
     const input = [
