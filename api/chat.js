@@ -1,4 +1,4 @@
-// /api/chat.js — FINAL STABLE BACKEND (ED AI Tutor v2025.14)
+// /api/chat.js — HARDENED BACKEND (ED AI Tutor v2025.14)
 
 import OpenAI from "openai";
 import fs from "fs/promises";
@@ -58,32 +58,13 @@ async function loadEngines() {
 }
 
 // -----------------------------
-// Extract plain text from Responses API
-// -----------------------------
-function extractText(response) {
-  try {
-    // 🔧 FIX: make *response itself* optional
-    const blocks = response?.output?.[0]?.content || [];
-
-    for (const block of blocks) {
-      if (typeof block.text === "string") return block.text;
-      if (block.output_text?.text) return block.output_text.text;
-    }
-  } catch (err) {
-    console.warn("⚠️ Failed to extract text from response:", err.message);
-  }
-
-  return "";
-}
-
-// -----------------------------
 // MAIN HANDLER WITH CORS
 // -----------------------------
 export default async function handler(req, res) {
   const allowedOrigins = [
     "https://edaitutor.org",
     "https://www.edaitutor.org",
-    "https://ed-ai-tutor-frontend.vercel.app"
+    "https://ed-ai-tutor-frontend.vercel.app",
   ];
 
   const origin = req.headers.origin;
@@ -113,7 +94,7 @@ export default async function handler(req, res) {
   try {
     const [instructions, engines] = await Promise.all([
       loadInstructions(),
-      loadEngines()
+      loadEngines(),
     ]);
 
     const input = [
@@ -131,13 +112,48 @@ export default async function handler(req, res) {
       },
     ];
 
+    // Use Responses API with a model that supports it
     const aiResponse = await client.responses.create({
-      model: "gpt-4.1",
+      model: "gpt-4.1-mini",
       instructions,
       input,
     });
 
-    const outputText = extractText(aiResponse);
+    // Log the raw response so we can debug if needed
+    console.log(
+      "🧠 ED AI Tutor raw response:",
+      JSON.stringify(aiResponse, null, 2)
+    );
+
+    // -----------------------------
+    // Safely extract text
+    // -----------------------------
+    let outputText = "";
+
+    try {
+      const outputs = aiResponse?.output ?? [];
+
+      for (const item of outputs) {
+        const contentBlocks = item?.content ?? [];
+        for (const block of contentBlocks) {
+          if (typeof block.text === "string") {
+            outputText += block.text;
+          } else if (block?.output_text?.text) {
+            outputText += block.output_text.text;
+          }
+        }
+      }
+    } catch (innerErr) {
+      console.warn(
+        "⚠️ Failed to parse response.output safely:",
+        innerErr.message
+      );
+    }
+
+    if (!outputText) {
+      outputText =
+        "Sorry, I couldn't generate a detailed response just now. Please try rephrasing your question.";
+    }
 
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     return res.status(200).send(outputText);
