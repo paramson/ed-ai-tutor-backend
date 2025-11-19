@@ -1,4 +1,4 @@
-// /api/chat.js — FINAL BACKEND WITH CORS
+// /api/chat.js — FINAL BACKEND WITH MULTI-ORIGIN CORS (ED AI Tutor v2025.14)
 
 import OpenAI from "openai";
 import fs from "fs/promises";
@@ -8,6 +8,9 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// -----------------------------
+// Load Instructions File
+// -----------------------------
 async function loadInstructions() {
   try {
     const filePath = path.join(
@@ -22,6 +25,9 @@ async function loadInstructions() {
   }
 }
 
+// -----------------------------
+// Load Engines Folder
+// -----------------------------
 async function loadEngines() {
   const enginesDir = path.join(process.cwd(), "engines");
   let files = [];
@@ -51,6 +57,9 @@ async function loadEngines() {
   return engines;
 }
 
+// -----------------------------
+// Extract plain text from Responses API
+// -----------------------------
 function extractText(response) {
   try {
     const blocks = response.output?.[0]?.content || [];
@@ -59,17 +68,33 @@ function extractText(response) {
       if (block.output_text?.text) return block.output_text.text;
     }
   } catch (_) {}
+
   return "";
 }
 
+// -----------------------------
+// Handler with MULTI-ORIGIN CORS
+// -----------------------------
 export default async function handler(req, res) {
   // -----------------------------
-  // CORS FIX
+  // CORRECT CORS — supports 3 origins
   // -----------------------------
-  res.setHeader("Access-Control-Allow-Origin", "https://edaitutor.org");
+  const allowedOrigins = [
+    "https://edaitutor.org",
+    "https://www.edaitutor.org",
+    "https://ed-ai-tutor-frontend.vercel.app"
+  ];
+
+  const origin = req.headers.origin;
+
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
+  // Preflight request
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
