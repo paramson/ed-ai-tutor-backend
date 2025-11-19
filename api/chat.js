@@ -3,9 +3,6 @@ import fetch from "node-fetch";
 import fs from "fs/promises";
 import path from "path";
 
-// ---------------------------------------------------
-//  CORS ALLOW (FIXES YOUR FRONTEND CONNECTION ERROR)
-// ---------------------------------------------------
 export const config = {
   api: {
     bodyParser: true,
@@ -13,7 +10,7 @@ export const config = {
 };
 
 // -----------------------------
-//  Load Instruction File
+// Load Instruction File
 // -----------------------------
 async function loadInstructions() {
   const filePath = path.join(
@@ -25,20 +22,18 @@ async function loadInstructions() {
 }
 
 // -----------------------------
-//  Load Engines
+// Load Engines
 // -----------------------------
 async function loadEngines() {
   const enginesDir = path.join(process.cwd(), "engines");
   const engineFiles = await fs.readdir(enginesDir);
 
   const engines = {};
-
   for (const file of engineFiles) {
     const filePath = path.join(enginesDir, file);
     const content = await fs.readFile(filePath, "utf-8");
     engines[file.replace(".json", "")] = JSON.parse(content);
   }
-
   return engines;
 }
 
@@ -57,60 +52,62 @@ async function fetchGithubGuideline(query) {
   const file = results.items[0];
   const fileData = await fetch(file.url).then((res) => res.json());
   const decoded = Buffer.from(fileData.content, "base64").toString("utf-8");
-
   return decoded;
 }
 
-// -----------------------------
-//    MAIN API ROUTE
-// -----------------------------
+// --------------------------------------------------
+// MAIN HANDLER — NOW STREAMING FOR YOUR FRONTEND
+// --------------------------------------------------
 export default async function handler(req, res) {
-  // ----------------- CORS FIX -----------------
+  // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end(); // CORS preflight
-  }
-  // --------------------------------------------
-
-  if (req.method !== "POST") {
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST")
     return res.status(405).json({ error: "POST only" });
-  }
 
-  const { message } = req.body;
-  if (!message) return res.status(400).json({ error: "Missing message" });
+  const { message, model = "gpt-4.1", engine = "None" } = req.body;
 
-  // Load instructions & engines
+  if (!message)
+    return res.status(400).json({ error: "Message is required" });
+
+  // Load resources
   const systemInstructions = await loadInstructions();
   const engines = await loadEngines();
+  const guideline = await fetchGithubGuideline(
+    message.split(" ").slice(0, 5).join(" ")
+  );
 
-  // Auto-detect GitHub search term
-  const keyword = message.split(" ").slice(0, 5).join(" ");
-  const guideline = await fetchGithubGuideline(keyword);
-
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
-
-  // Build final context
+  // Build context
   const context = `
 ${systemInstructions}
 
-=== ENGINES ===
+=== ENGINE SETTINGS ===
 ${JSON.stringify(engines, null, 2)}
 
-=== AUTO-RETRIEVED GITHUB GUIDELINE ===
+=== AUTO-RETRIEVED GUIDELINE ===
 ${guideline || "No guideline found"}
 
 === USER QUESTION ===
 ${message}
 `;
 
-  // Call OpenAI
+  // Set streaming headers
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+  // -----------------------------
+  // STREAM FROM OPENAI
+  // -----------------------------
   const completion = await openai.chat.completions.create({
-    model: "gpt-4.1",
+    model,
+    stream: true,
     messages: [
       { role: "system", content: context },
       { role: "user", content: message },
@@ -118,7 +115,16 @@ ${message}
     temperature: 0.2,
   });
 
-  const reply = completion.choices[0].message.content;
+  // Send tokens as SSE
+  for await (const chunk of completion) {
+    const token = chunk?.choices?.[0]?.delta?.content;
 
-  return res.status(200).json({ reply });
+    if (token) {
+      res.write(`data: ${token}\n\n`);
+    }
+  }
+
+  // End
+  res.write("data: [END]\n\n");
+  res.end();
 }
