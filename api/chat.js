@@ -45,7 +45,6 @@ const GITHUB_REPO = "paramson/edaitutor-reference-library";
 
 async function searchGithubGuidelines(message, maxFiles = 3) {
   try {
-    // Simple keyword extraction from user message
     const words = message.split(/\s+/).slice(0, 12);
     const keywords = words.join(" ");
 
@@ -77,7 +76,6 @@ async function searchGithubGuidelines(message, maxFiles = 3) {
 
         const decoded = Buffer.from(fileData.content, "base64").toString("utf-8");
 
-        // Optional: truncate very large files to keep token usage reasonable
         const MAX_CHARS = 8000;
         const truncatedContent =
           decoded.length > MAX_CHARS ? decoded.slice(0, MAX_CHARS) + "\n\n...[truncated]" : decoded;
@@ -99,7 +97,7 @@ async function searchGithubGuidelines(message, maxFiles = 3) {
 }
 
 // -----------------------------
-// Build System Prompt
+// Build System Prompt (Markdown + icons)
 // -----------------------------
 function buildSystemPrompt({
   systemInstructions,
@@ -116,95 +114,145 @@ function buildSystemPrompt({
 
   const referencedModules =
     githubGuidelines.length > 0
-      ? githubGuidelines.map((g) => `• ${g.path}`).join("\n")
-      : "None found (fallback to engines + core reasoning).";
+      ? githubGuidelines.map((g) => `- \`${g.path}\``).join("\n")
+      : "- None found (fallback to engines + core reasoning).";
 
   const guidelinesContent =
     githubGuidelines.length > 0
       ? githubGuidelines
           .map(
             (g, idx) =>
-              `--- GitHub Module ${idx + 1}: ${g.path} ---\n${g.content}`
+              `### 📄 GitHub Module ${idx + 1}: \`${g.path}\`\n\n` +
+              "```text\n" +
+              g.content +
+              "\n```"
           )
-          .join("\n\n")
-      : "No GitHub guideline content retrieved. Use engines + generic guideline knowledge, but state that GitHub modules were not available.";
+          .join("\n\n---\n\n")
+      : "_No GitHub guideline content retrieved for this query. Use local engines + general guideline knowledge, and clearly state that GitHub modules were not available._";
 
   return `
 ${systemInstructions}
 
-====================================================
-ED AI TUTOR – BACKEND ORCHESTRATION LAYER (SERVER)
-====================================================
+---
 
-You are running in BACKEND MODE. Always follow these orchestration rules:
+You are running in **BACKEND ORCHESTRATION MODE** for ED AI Tutor.
 
-1) STEPWISE CLINICAL REASONING
-   • Start with pattern recognition from the case.
-   • Generate key differentials (common / serious / rare).
-   • Highlight red flags → if present, clearly state:
-     "🔴 PRIORITY: ABCDE FIRST – RESUSCITATION TAKES PRIORITY OVER DIAGNOSTICS."
-   • Perform risk stratification (low / moderate / high).
-   • Structure the answer as:
-     - Initial Assessment & ABCDE
-     - Differentials
-     - Risk Stratification
-     - Investigations (bedside → labs → imaging)
-     - Management (time-critical → core ED care → adjuncts)
-     - Disposition
-     - Safety-netting
+You **MUST** format all clinical answers using **clean GitHub-flavoured Markdown** with clear section headings and clinical icons.
 
-2) ENGINE INTEGRATION
-   • Available local engines: ${engineList.join(", ") || "none detected"}.
-   • ${activeEngineNote}
-   • Never contradict engine logic. If conflict arises, favour the safer, more conservative path.
+Use this exact structure (adapt names to the case):
 
-3) GITHUB GUIDELINE INTEGRATION (MANDATORY WHEN AVAILABLE)
-   • Referenced GitHub Modules (auto-retrieved by backend):
+## 🧠 STEPWISE CLINICAL REASONING (Short Title – e.g. Chest Pain – ACS Pathway)
+
+### 📁 Referenced GitHub Modules
 ${referencedModules}
 
-   • Use these modules as primary guideline sources when relevant.
-   • Extract algorithms, red flags, investigations, dosing, and disposition guidance from them.
-   • Explicitly cite them in the answer under:
-     "Referenced GitHub Modules: <file>"
+---
 
-4) OUTPUT FORMAT FOR CLINICAL CASES
-   • Use clear headings and bullet points.
-   • Explicitly signpost red flags with 🔴.
-   • Use confidence icons where appropriate:
-     - 🟢 high confidence
-     - 🟡 moderate/uncertain
-     - ⚪ low/limited evidence
-   • Finish EVERY clinical answer with:
-     a) "Referenced GitHub Modules" (list the module paths used, or "None available")
-     b) "International Guideline References (general, not patient-specific):"
-        - AU: RCH Clinical Guidelines / ACI NSW
-        - NZ: Starship Clinical Guidelines
-        - UK: NICE / RCEM
-        - USA: ACEP / AAP
-        - CAN: CAEP
+### ⚠️ PRIORITY: ABCDE FIRST
+- **Airway:** ...
+- **Breathing:** ...
+- **Circulation:** ...
+- **Disability:** ...
+- **Exposure:** ...
 
-5) OPTIONAL FOLLOW-UP MODE (BACKEND ENFORCED)
-   • After completing the clinical answer, append:
-     "Would you like:
-       1) ACEM-style exam practice based on this case (MCQ / SAQ / Viva), or
-       2) 1–2 key recent papers/guideline updates with brief PICO-style summaries?"
-   • Do NOT generate questions or research summaries until the user explicitly says yes.
+If unstable → clearly state:  
+\`If unstable, immediate resuscitation in resus bay takes priority over diagnostics.\`
 
-====================================================
-AUTO-RETRIEVED GITHUB GUIDELINE CONTENT
-(Already fetched by backend – do NOT call APIs yourself)
-====================================================
+---
+
+### 1️⃣ INITIAL DIFFERENTIAL DIAGNOSIS
+**Common**
+- ...
+
+**Serious – must not miss**
+- ...
+
+**Rare / other**
+- ...
+
+---
+
+### 2️⃣ 🧪 INVESTIGATIONS
+**Bedside**
+- ...
+
+**Laboratory**
+- ...
+
+**Imaging**
+- ...
+
+---
+
+### 3️⃣ 💊 EMERGENCY DEPARTMENT MANAGEMENT
+**Time-critical / resuscitation**
+- ...
+
+**Core ED care**
+- ...
+
+**Adjuncts**
+- ...
+
+---
+
+### 4️⃣ 🚑 DISPOSITION
+- Admit vs discharge criteria
+- Ward / HDU / ICU / theatre
+- Follow-up and referrals
+
+---
+
+### 5️⃣ 🛡️ SAFETY-NETTING & PATIENT EDUCATION
+- Red flags to return
+- Expected course
+- Written/ verbal instructions
+
+---
+
+### 📚 Referenced GitHub Modules
+${referencedModules}
+
+### 🌍 International Guideline References (general, not patient-specific)
+- AU: RCH Clinical Guidelines / ACI NSW  
+- NZ: Starship Clinical Guidelines  
+- UK: NICE / RCEM  
+- USA: ACEP / AAP  
+- CAN: CAEP  
+
+---
+
+### 🔄 Optional Follow-Up (you must append this text verbatim)
+At the end of every clinical case answer, append:
+
+> Would you like:
+> 1) ACEM-style exam practice based on this case (MCQ / SAQ / Viva), or  
+> 2) 1–2 key recent papers or guideline updates with brief PICO-style summaries?
+
+Do **not** generate exam questions or research content unless the user explicitly says yes.
+
+---
+
+### ENGINE INTEGRATION (INTERNAL)
+Available engines: ${engineList.join(", ") || "none detected"}  
+${activeEngineNote}
+
+Use the engines plus the GitHub modules **before** answering. Never contradict engine logic.
+
+---
+
+### PRE-FETCHED GITHUB GUIDELINE CONTENT (READ & INTEGRATE, DO NOT CALL APIs)
 ${guidelinesContent}
 
-====================================================
-USER QUESTION (FOR CONTEXT)
-====================================================
+---
+
+### USER QUESTION (FOR CONTEXT)
 ${userMessage}
 `;
 }
 
 // --------------------------------------------------
-// MAIN HANDLER — STREAMING FOR YOUR FRONTEND
+// MAIN HANDLER — STREAMING FOR FRONTEND
 // --------------------------------------------------
 export default async function handler(req, res) {
   // CORS
@@ -223,7 +271,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Message is required" });
     }
 
-    // Load resources in parallel
     const [systemInstructions, engines, githubGuidelines] = await Promise.all([
       loadInstructions(),
       loadEngines(),
@@ -238,16 +285,15 @@ export default async function handler(req, res) {
       activeEngine: engine,
     });
 
-    // Set streaming headers
+    // Streaming headers
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
-    // @ts-ignore – some runtimes support flush
+    // @ts-ignore
     if (res.flushHeaders) res.flushHeaders();
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    // STREAM FROM OPENAI
     const completion = await openai.chat.completions.create({
       model,
       stream: true,
@@ -261,6 +307,7 @@ export default async function handler(req, res) {
     for await (const chunk of completion) {
       const token = chunk?.choices?.[0]?.delta?.content;
       if (token) {
+        // send raw tokens; frontend handles markdown + spacing
         res.write(`data: ${token}\n\n`);
       }
     }
@@ -276,7 +323,6 @@ export default async function handler(req, res) {
       res.write("data: [END]\n\n");
       res.end();
     } catch {
-      // If streaming already broken, just end silently
       if (!res.headersSent) {
         res.status(500).json({ error: "Internal server error" });
       }
