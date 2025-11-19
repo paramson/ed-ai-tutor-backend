@@ -1,1 +1,34 @@
-{}
+{
+  "engine_name": "Analgesia Engine",
+  "description": "Handles acute pain assessment and analgesia pathways.",
+  "patterns": [
+    "pain",
+    "analgesia",
+    "renal colic",
+    "fracture pain",
+    "severe pain",
+    "opioid",
+    "NSAID"
+  ],
+  "sections": {
+    "assessment": [
+      "Pain score (0–10)",
+      "Red flags: sepsis, ACS, compartment syndrome",
+      "Functional impact"
+    ],
+    "initial_management": [
+      "Paracetamol",
+      "NSAIDs (if no contraindication)",
+      "Oral opioids if moderate pain"
+    ],
+    "severe_management": [
+      "IV opioids titrated",
+      "Ketamine low-dose infusion",
+      "Nerve blocks where appropriate"
+    ],
+    "references": [
+      "RCH Acute Pain Guideline",
+      "ANZCA acute pain management"
+    ]
+  }
+}
