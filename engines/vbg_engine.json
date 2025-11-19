@@ -1,1 +1,22 @@
-{}
+{
+  "engine_name": "VBG Interpretation Engine",
+  "description": "Handles VBG interpretation including acid–base and ventilation.",
+  "patterns": [
+    "VBG",
+    "ABG",
+    "acidosis",
+    "alkalosis",
+    "hypercapnia",
+    "respiratory failure"
+  ],
+  "rules": {
+    "acidosis": "pH < 7.35",
+    "alkalosis": "pH > 7.45",
+    "respiratory": "CO₂ > 45",
+    "metabolic": "HCO₃ < 22"
+  },
+  "example": {
+    "case": "pH 7.29, CO₂ 60, HCO₃ 28",
+    "interpretation": "Primary respiratory acidosis with metabolic compensation"
+  }
+}
