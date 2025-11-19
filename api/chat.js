@@ -126,8 +126,9 @@ export default async function handler(req, res) {
       },
     ];
 
+    // 🔥 FIX: gpt-4.1 (Compatible with Responses API)
     const aiResponse = await client.responses.create({
-      model: "gpt-5.1",
+      model: "gpt-4.1",
       instructions,
       input,
     });
