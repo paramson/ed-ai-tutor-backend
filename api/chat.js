@@ -1,20 +1,13 @@
-// /api/chat.js — FINAL BACKEND (ED AI Tutor v2025.14)
-// Node.js on Vercel — ESM syntax
+// /api/chat.js — FINAL BACKEND WITH CORS
 
 import OpenAI from "openai";
 import fs from "fs/promises";
 import path from "path";
 
-// -----------------------------
-// OpenAI Client
-// -----------------------------
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// -----------------------------
-// Load Instructions File
-// -----------------------------
 async function loadInstructions() {
   try {
     const filePath = path.join(
@@ -29,9 +22,6 @@ async function loadInstructions() {
   }
 }
 
-// -----------------------------
-// Load Engines Folder (all JSON)
-// -----------------------------
 async function loadEngines() {
   const enginesDir = path.join(process.cwd(), "engines");
   let files = [];
@@ -61,9 +51,6 @@ async function loadEngines() {
   return engines;
 }
 
-// -----------------------------
-// Extract text from Responses API output
-// -----------------------------
 function extractText(response) {
   try {
     const blocks = response.output?.[0]?.content || [];
@@ -72,16 +59,24 @@ function extractText(response) {
       if (block.output_text?.text) return block.output_text.text;
     }
   } catch (_) {}
-
   return "";
 }
 
-// -----------------------------
-// Route Handler (POST only)
-// -----------------------------
 export default async function handler(req, res) {
+  // -----------------------------
+  // CORS FIX
+  // -----------------------------
+  res.setHeader("Access-Control-Allow-Origin", "https://edaitutor.org");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  // Only allow POST
   if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
+    res.setHeader("Allow", "POST, OPTIONS");
     return res.status(405).json({ error: "Method not allowed" });
   }
 
@@ -92,13 +87,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Load instructions + engines together
     const [instructions, engines] = await Promise.all([
       loadInstructions(),
       loadEngines(),
     ]);
 
-    // Build request payload for Responses API
     const input = [
       {
         role: "user",
@@ -114,9 +107,8 @@ export default async function handler(req, res) {
       },
     ];
 
-    // Call OpenAI Responses API
     const aiResponse = await client.responses.create({
-      model: "gpt-5.1", // Change to "gpt-4.1" or "gpt-4.1-mini" if needed
+      model: "gpt-5.1",
       instructions,
       input,
     });
