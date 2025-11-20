@@ -1,10 +1,12 @@
-// /api/chat.js — FIXED BACKEND
+// /api/chat.js — FINAL FIXED BACKEND (ED AI Tutor v2025.14)
 
 import OpenAI from "openai";
 import fs from "fs/promises";
 import path from "path";
 
-// Load instructions
+// -----------------------------
+// Load Instruction File
+// -----------------------------
 async function loadInstructions() {
   const filePath = path.join(
     process.cwd(),
@@ -14,7 +16,9 @@ async function loadInstructions() {
   return await fs.readFile(filePath, "utf-8");
 }
 
-// Load engines
+// -----------------------------
+// Load Engines Folder
+// -----------------------------
 async function loadEngines() {
   const enginesDir = path.join(process.cwd(), "engines");
   const engines = {};
@@ -27,13 +31,16 @@ async function loadEngines() {
         engines[file.replace(".json", "")] = JSON.parse(raw);
       }
     }
-  } catch (e) {
-    console.warn("No engines folder");
+  } catch {
+    console.warn("⚠️ Engines folder not found");
   }
 
   return engines;
 }
 
+// -----------------------------
+// MAIN HANDLER
+// -----------------------------
 export default async function handler(req, res) {
   // CORS
   const allowedOrigins = [
@@ -55,21 +62,19 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { message } = req.body;
-
+  // Extract message
+  const { message } = req.body || {};
   if (!message) {
     return res.status(400).json({ error: "Missing message" });
   }
 
-  // FIX #1 — correct env lookup
+  // Load API key
   const apiKey = process.env.OPENAI_API_KEY;
-
   if (!apiKey) {
-    console.error("❌ OPENAI_API_KEY missing");
+    console.error("❌ Missing OPENAI_API_KEY");
     return res.status(500).json({ error: "Server misconfiguration" });
   }
 
-  // FIX #2 — valid OpenAI client
   const client = new OpenAI({ apiKey });
 
   try {
@@ -78,6 +83,9 @@ export default async function handler(req, res) {
       loadEngines()
     ]);
 
+    // -----------------------------
+    // VALID Responses API payload
+    // -----------------------------
     const aiResponse = await client.responses.create({
       model: "gpt-4.1-mini",
       instructions,
@@ -85,28 +93,39 @@ export default async function handler(req, res) {
         {
           role: "user",
           content: [
-            { type: "input_text", text: message },
             {
               type: "input_text",
-              text: "\n\n[ED AI Tutor Engines]\n" + JSON.stringify(engines, null, 2)
+              text:
+                message +
+                "\n\n[ED AI Tutor Engines]\n" +
+                JSON.stringify(engines, null, 2)
             }
           ]
         }
       ]
     });
 
-    // Extract text
-    let output = "";
+    // -----------------------------
+    // Extract text output safely
+    // -----------------------------
+    let outputText = "";
 
-    const outputs = aiResponse?.output ?? [];
+    const outputs = aiResponse?.output || [];
     for (const item of outputs) {
-      for (const block of item?.content ?? []) {
-        if (block.text) output += block.text;
-        if (block.output_text?.text) output += block.output_text.text;
+      for (const block of item.content || []) {
+        if (block.type === "output_text" && block.text) {
+          outputText += block.text;
+        }
+        if (block.output_text?.text) {
+          outputText += block.output_text.text;
+        }
       }
     }
 
-    return res.status(200).send(output || "No response generated.");
+    if (!outputText) outputText = "No response generated.";
+
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    return res.status(200).send(outputText);
   } catch (err) {
     console.error("❌ Backend error:", err);
     return res.status(500).json({ error: err.message });
