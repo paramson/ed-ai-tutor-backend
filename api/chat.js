@@ -4,10 +4,6 @@ import OpenAI from "openai";
 import fs from "fs/promises";
 import path from "path";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 // -----------------------------
 // Load Instruction File
 // -----------------------------
@@ -92,12 +88,25 @@ export default async function handler(req, res) {
   }
 
   // ------------------------------------
-  // 🔑 DEBUG LINE — CONFIRM API KEY
+  // 🔑 DEBUG ENV + API KEY
   // ------------------------------------
+  const apiKey = globalThis.process?.env?.OPENAI_API_KEY || "";
+  console.log("🔍 process defined?", typeof globalThis.process !== "undefined");
   console.log(
-    "🔑 API KEY LOADED:",
-    process.env.OPENAI_API_KEY ? "YES" : "NO"
+    "🔍 env defined?",
+    globalThis.process && globalThis.process.env ? "YES" : "NO"
   );
+  console.log("🔑 API KEY LOADED:", apiKey ? "YES" : "NO");
+
+  if (!apiKey) {
+    console.error("❌ OPENAI_API_KEY is missing in environment variables.");
+    return res.status(500).json({
+      error: "Server misconfiguration: OPENAI_API_KEY missing.",
+    });
+  }
+
+  // Create OpenAI client **inside** handler
+  const client = new OpenAI({ apiKey });
 
   try {
     const [instructions, engines] = await Promise.all([
@@ -120,14 +129,12 @@ export default async function handler(req, res) {
       },
     ];
 
-    // Use Responses API with a model that supports it
     const aiResponse = await client.responses.create({
       model: "gpt-4.1-mini",
       instructions,
       input,
     });
 
-    // Log the raw response so we can debug if needed
     console.log(
       "🧠 ED AI Tutor raw response:",
       JSON.stringify(aiResponse, null, 2)
