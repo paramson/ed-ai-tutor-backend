@@ -91,6 +91,14 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Invalid or missing message." });
   }
 
+  // ------------------------------------
+  // 🔑 DEBUG LINE — CONFIRM API KEY
+  // ------------------------------------
+  console.log(
+    "🔑 API KEY LOADED:",
+    process.env.OPENAI_API_KEY ? "YES" : "NO"
+  );
+
   try {
     const [instructions, engines] = await Promise.all([
       loadInstructions(),
